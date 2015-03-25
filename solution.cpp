@@ -57,19 +57,31 @@ enum cell_type
 	crime
 };
 
-typedef struct proc_data
+struct ProcData  // Processed data structer
 {
 	cell_type type;
 	void * data;
-}PROC_DATA;
+};
+
+struct ProdCostStruct
+{
+	intptr_t thrID;
+	const TCostProblem * (* costFunc) ( void ); // Pointer to costFunc
+};
+
+struct ProdCrimeStruct
+{
+	intptr_t thrID;
+	const TCrimeProblem * (* crimeFunc) ( void ); // Pointer to crimeFunc
+};
 
 PROC_DATA 			* g_Queue;
-int 				g_Pos = 0, g_Prods = 2, g_Conrs;
+int 				g_Pos, g_Prods, g_Conrs;
 
 pthread_mutex_t  	g_Mtx;
 sem_t 				g_Full, g_Free;
 
-void * prodFunc ( intptr_t  id )
+void * prodFunc ( intptr_t  id ) // To be implemented a prodFunc for each type of producer
  {
 	int i;
 	 
@@ -124,8 +136,15 @@ void MapAnalyzer ( int threads, const TCostProblem * (* costFunc) ( void ), cons
 
 	thrID = (pthread_t *) malloc ( sizeof ( *thrID ) * ( prod + cons ) );
 
+	// Initialization of global variables
 	g_Queue = (PROC_DATA *) malloc ( sizeof ( *g_Queue ) * ( threads + 6 ) );
 	g_Conrs = threads;
+	g_Prods = 2;
+	g_Pos = 0;
+
+	// Creating the data for the producers
+	ProdCostStruct 		s_ProdCostData;
+	ProdCrimeStruct		s_ProdCrimeData; 
 
 	pthread_attr_init ( &attr );
 	pthread_attr_setdetachstate ( &attr, PTHREAD_CREATE_JOINABLE );
@@ -134,15 +153,28 @@ void MapAnalyzer ( int threads, const TCostProblem * (* costFunc) ( void ), cons
 	sem_init ( &g_Free, 0, threads );        //fourth problem - the size of the initial free space is the size of the entire buffer
 	sem_init ( &g_Full, 0, 0 );                  //fourth problem
 
-	for (int i = 0; i < 2; i++)
+	if ( pthread_create (&thrID[0], &attr, prodCostFunc, (void*) (&s_ProdCostData)) )
 	{
-		if ( pthread_create ( &thrID[i], &attr, (void*(*)(void*)) consFunc, (void*)(intptr_t) (i + 1) ) )
-		{
-			perror ( "pthread_create" );
-			return ( 1 );    
-		}
+		perror ( "pthread_create" );
+		return ( 1 ); 
+	}
+	if ( pthread_create (&thrID[1], &attr, prodCrimeFunc, (void*) (&s_ProdCrimeData)) )
+	{
+		perror ( "pthread_create" );
+		return ( 1 ); 
+	}
+
+	// for (int i = 0; i < 2; i++)
+	// {
+	// 	if ( pthread_create ( &thrID[i], &attr, (void*(*)(void*)) prodFunc, (void*)(intptr_t) (i + 1) ) )
+	// 	{
+	// 		perror ( "pthread_create" );
+	// 		return ( 1 );    
+	// 	}
+	// }
+
 	for ( i = 0; i < threads; i ++ )
-		if ( pthread_create ( &thrID[i + cons], &attr, (void*(*)(void*)) prodFunc, (void*)(intptr_t) (i + 1) ) )
+		if ( pthread_create ( &thrID[i + threads], &attr, (void*(*)(void*)) consFunc, (void*)(intptr_t) (i + 1) ) )
 		{
 			perror ( "pthread_create" );
 			return ( 1 );    
