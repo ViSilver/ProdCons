@@ -64,45 +64,53 @@ typedef struct proc_data
 }PROC_DATA;
 
 PROC_DATA 			* g_Queue;
-int 				g_Pos = 0;
+int 				g_Pos = 0, g_Prods = 2, g_Conrs;
 
 pthread_mutex_t  	g_Mtx;
 sem_t 				g_Full, g_Free;
 
 void * prodFunc ( intptr_t  id )
  {
-	int i, j, a = 0;
+	int i;
 	 
 	for ( i = 0; ; i ++ )
 		{
-			for ( j = 0; j < 5000; j ++ ) /* it takes some time to "produce" */
-			 	a += j;
+			// Call the problem generating function and store the data into a local variable
+			// Check if the received value is NULL
+
 			sem_wait ( &g_Free );
 			pthread_mutex_lock ( &g_Mtx );   //first erorr
-			g_Buffer[g_Pos] . m_ID  = id;
-			g_Buffer[g_Pos] . m_Val = i;
-			g_Pos ++;
+			
+			// set the current cell of the queue to the problem pointer
+			// increment g_Pos
+
 			pthread_mutex_unlock ( &g_Mtx );
 			sem_post ( &g_Full );
-			printf ( "Producer %d done\n", (int)id ); //second erorr
+			
 		}
 	return ( NULL );
  }
 
 void * consFunc ( intptr_t  id )
  {
-	int from, val;
 	while ( 1 )
 		{
-			sleep(1);
+			//sleep(1);
 			sem_wait ( &g_Full );
 			pthread_mutex_lock ( &g_Mtx );
-			g_Pos --;    //third problem - we are accessing empty data in the queue
-			from = g_Buffer[g_Pos] . m_ID;
-			val = g_Buffer[g_Pos] . m_Val;
+
+			// decrement g_Pos
+			// get the structure of data and set the value of the array to NULL
+
 			pthread_mutex_unlock ( &g_Mtx );
 			sem_post ( &g_Free );
-			printf ( "Consumer %d received %d from %d\n", (int)id, val, from );
+
+			// Check if it is dummy - check if it is the last consumer
+			// If it is dummy - deallocate the dynamic variables
+
+			// Call the problem function and solve it
+			// call the m_Done() function
+			
 		}
 	return ( NULL );
  }
@@ -115,8 +123,9 @@ void MapAnalyzer ( int threads, const TCostProblem * (* costFunc) ( void ), cons
 	pthread_attr_t   attr;
 
 	thrID = (pthread_t *) malloc ( sizeof ( *thrID ) * ( prod + cons ) );
-	
+
 	g_Queue = (PROC_DATA *) malloc ( sizeof ( *g_Queue ) * ( threads + 6 ) );
+	g_Conrs = threads;
 
 	pthread_attr_init ( &attr );
 	pthread_attr_setdetachstate ( &attr, PTHREAD_CREATE_JOINABLE );
