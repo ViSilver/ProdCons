@@ -90,6 +90,8 @@ void * prodFunc ( intptr_t  id ) // To be implemented a prodFunc for each type o
 			// Call the problem generating function and store the data into a local variable
 			// Check if the received value is NULL
 
+			var = 
+
 			sem_wait ( &g_Free );
 			pthread_mutex_lock ( &g_Mtx );   //first erorr
 			
