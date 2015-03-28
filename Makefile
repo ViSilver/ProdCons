@@ -2,17 +2,19 @@ CXX=g++
 # CXXFLAGS= -std=c++11 -Wall -pedantic -g
 CXXFLAGS=-Wall -pedantic -g 
 LIBS=-lpthread
+TARGET = ./bin
+SOURCE = ./src
 
-all: seqtest speedtest thrtest
+all: $(TARGET)/seqtest $(TARGET)/speedtest $(TARGET)/thrtest
 
-seqtest: seqmain.cpp solution.cpp
-	$(CXX) $(CXXFLAGS) -o bin/$@ $< $(LIBS)
+$(TARGET)/seqtest: $(SOURCE)/seqmain.cpp $(SOURCE)/solution.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $< $(LIBS)
 
-speedtest: speedmain.cpp solution.cpp
-	$(CXX) $(CXXFLAGS) -o bin/$@ $< $(LIBS)
+$(TARGET)/speedtest: $(SOURCE)/speedmain.cpp $(SOURCE)/solution.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $< $(LIBS)
 
-thrtest: thrmain.cpp solution.cpp
-	$(CXX) $(CXXFLAGS) -o bin/$@ $< $(LIBS)
+$(TARGET)/thrtest: $(SOURCE)/thrmain.cpp $(SOURCE)/solution.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $< $(LIBS)
 
 clean:
 	rm -f core *~ *.o seqtest speedtest thrtest
