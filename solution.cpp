@@ -21,6 +21,7 @@ using namespace std;
 #endif /* __cplusplus */
 
 
+
 struct TRect
  {
 	 int             m_X;
