@@ -48,6 +48,8 @@ struct TCrimeProblem
 
 #endif /* __PROGTEST__ */
 
+#define __MAC__
+
 
 // My global variables
 
@@ -66,21 +68,25 @@ typedef struct ProcData  // Processed data structer
 
 struct ProdCostStruct
 {
-	intptr_t thrID;
-	const TCostProblem * (* costFunc) ( void ); // Pointer to costFunc
+	//intptr_t thrID;
+	const TCostProblem * (* tCostFunc) ( void ); // Pointer to costFunc
 };
 
 struct ProdCrimeStruct
 {
-	intptr_t thrID;
-	const TCrimeProblem * (* crimeFunc) ( void ); // Pointer to crimeFunc
+	//intptr_t thrID;
+	const TCrimeProblem * (* tCrimeFunc) ( void ); // Pointer to crimeFunc
 };
 
 PROC_DATA 			* g_Queue;
 int 				g_Pos, g_Prods, g_Conrs;
 
 pthread_mutex_t  	g_Mtx;
+#ifndef __MAC__
 sem_t 				g_Full, g_Free;
+#else
+sem_t 				*g_Full, *g_Free;
+#endif
 
 void * prodCostFunc ( void * ) // To be implemented a prodFunc for each type of producer
  {
@@ -93,14 +99,22 @@ void * prodCostFunc ( void * ) // To be implemented a prodFunc for each type of 
 
 			//var = 
 
-			sem_wait ( &g_Free );
+#ifndef __MAC__
+            sem_wait ( &g_Free );
+#else  // LINUX
+            sem_wait (g_Free);
+#endif  // MAC
 			pthread_mutex_lock ( &g_Mtx );   //first erorr
 			
 			// set the current cell of the queue to the problem pointer
 			// increment g_Pos
 
 			pthread_mutex_unlock ( &g_Mtx );
+#ifndef __MAC__
 			sem_post ( &g_Full );
+#else  // LINUX
+            sem_post (g_Full);
+#endif
 			
 		}
 	return ( NULL );
@@ -117,14 +131,22 @@ void * prodCostFunc ( void * ) // To be implemented a prodFunc for each type of 
 
 			//var = 
 
-			sem_wait ( &g_Free );
+#ifndef __MAC__
+            sem_wait ( &g_Free );
+#else  // LINUX
+            sem_wait (g_Free);
+#endif  // MAC
 			pthread_mutex_lock ( &g_Mtx );   //first erorr
 			
 			// set the current cell of the queue to the problem pointer
 			// increment g_Pos
 
 			pthread_mutex_unlock ( &g_Mtx );
-			sem_post ( &g_Full );
+#ifndef __MAC__
+            sem_post ( &g_Full );
+#else  // LINUX
+            sem_post (g_Full);
+#endif
 			
 		}
 	return ( NULL );
@@ -135,14 +157,22 @@ void * consFunc ( intptr_t  id )
 	while ( 1 )
 		{
 			//sleep(1);
-			sem_wait ( &g_Full );
+#ifndef __MAC__
+            sem_wait ( &g_Full );
+#else  // LINUX
+            sem_wait (g_Full);
+#endif  // MAC
 			pthread_mutex_lock ( &g_Mtx );
 
 			// decrement g_Pos
 			// get the structure of data and set the value of the array to NULL
 
 			pthread_mutex_unlock ( &g_Mtx );
-			sem_post ( &g_Free );
+#ifndef __MAC__
+            sem_post ( &g_Free );
+#else  // LINUX
+            sem_post (g_Free);
+#endif
 
 			// Check if it is dummy - check if it is the last consumer
 			// If it is dummy - deallocate the dynamic variables
@@ -157,39 +187,56 @@ void * consFunc ( intptr_t  id )
 void MapAnalyzer ( int threads, const TCostProblem * (* costFunc) ( void ), const TCrimeProblem* (* crimeFunc) ( void ) )
  {
 	//    
-	int prod, cons, i;
-	pthread_t      * thrID;
-	pthread_attr_t   attr;
+     int i;
+     pthread_t      * thrID;
+     pthread_attr_t   attr;
 
-	thrID = (pthread_t *) malloc ( sizeof ( *thrID ) * ( prod + cons ) );
+	thrID = (pthread_t *) malloc ( sizeof ( *thrID ) * ( threads + 2 ) );
 
 	// Initialization of global variables
-	g_Queue = (PROC_DATA *) malloc ( sizeof ( *g_Queue ) * ( threads + 6 ) );
-	g_Conrs = threads;
-	g_Prods = 2;
-	g_Pos = 0;
+     g_Queue = (PROC_DATA *) malloc ( sizeof ( *g_Queue ) * ( threads + 6 ) );
+     g_Conrs = threads;
+     g_Prods = 2;
+     g_Pos = 0;
 
 	// Creating the data for the producers
-	ProdCostStruct 		s_ProdCostData;
-	ProdCrimeStruct		s_ProdCrimeData; 
+     ProdCostStruct 		s_ProdCostData;
+     ProdCrimeStruct		s_ProdCrimeData;
 
-	pthread_attr_init ( &attr );
-	pthread_attr_setdetachstate ( &attr, PTHREAD_CREATE_JOINABLE );
+     s_ProdCostData.tCostFunc = costFunc;
+     s_ProdCrimeData.tCrimeFunc = crimeFunc;
+     
+     pthread_attr_init ( &attr );
+     pthread_attr_setdetachstate ( &attr, PTHREAD_CREATE_JOINABLE );
 
-	pthread_mutex_init ( &g_Mtx, NULL );
-	sem_init ( &g_Free, 0, threads );        //fourth problem - the size of the initial free space is the size of the entire buffer
-	sem_init ( &g_Full, 0, 0 );                  //fourth problem
+     pthread_mutex_init ( &g_Mtx, NULL );
+#ifndef __MAC__
+     sem_init ( &g_Free, 0, threads );        //fourth problem - the size of the initial free space is the size of the entire buffer
+     sem_init ( &g_Full, 0, 0 );                  //fourth problem
+#else   // LINUX
+     if ((g_Free = sem_open("/semaphore_free", O_CREAT, 0666, threads)) == SEM_FAILED)
+     {
+        perror("sem_open");
+        return;
+     }
+     
+     if ((g_Full = sem_open("/semaphore_full", O_CREAT, 0666, 0)) == SEM_FAILED)
+     {
+         perror("sem_open");
+         return;
+     }
+#endif   // MAC
 
-	if ( pthread_create (&thrID[0], &attr, prodCostFunc, (void*) (&s_ProdCostData)) )
-	{
-		perror ( "pthread_create" );
-		return; 
-	}
-	if ( pthread_create (&thrID[1], &attr, prodCrimeFunc, (void*) (&s_ProdCrimeData)) )
-	{
-		perror ( "pthread_create" );
-		return; 
-	}
+     if ( pthread_create (&thrID[0], &attr, prodCostFunc, (void*) (&s_ProdCostData)) )
+     {
+         perror ( "pthread_create" );
+         return;
+     }
+     if ( pthread_create (&thrID[1], &attr, prodCrimeFunc, (void*) (&s_ProdCrimeData)) )
+     {
+         perror ( "pthread_create" );
+         return;
+     }
 
 	// for (int i = 0; i < 2; i++)
 	// {
@@ -200,24 +247,48 @@ void MapAnalyzer ( int threads, const TCostProblem * (* costFunc) ( void ), cons
 	// 	}
 	// }
 
-	for ( i = 0; i < threads; i ++ )
-		if ( pthread_create ( &thrID[i + threads], &attr, (void*(*)(void*)) consFunc, (void*)(intptr_t) (i + 1) ) )
-		{
-			perror ( "pthread_create" );
-			return;    
-		}
-	pthread_attr_destroy ( &attr );  
+     for ( i = 0; i < threads; i ++ )
+         if ( pthread_create ( &thrID[i + threads], &attr, (void*(*)(void*)) consFunc, (void*)(intptr_t) (i + 1) ) )
+         {
+             perror ( "pthread_create" );
+             return;
+         }
+     pthread_attr_destroy ( &attr );
 		 
-	for ( i = 0; i < prod + cons; i ++ )
-		pthread_join ( thrID[i], NULL );  
+     for ( i = 0; i < threads + 2; i ++ )
+         pthread_join ( thrID[i], NULL );
 
-	pthread_mutex_destroy ( &g_Mtx );
-	sem_destroy ( &g_Free );
-	sem_destroy ( &g_Full );
+     pthread_mutex_destroy ( &g_Mtx );
+#ifndef __MAC__
+     sem_destroy ( &g_Free );
+     sem_destroy ( &g_Full );
+#else   // LINUX
+     if(sem_close(g_Free) == -1)
+     {
+        perror("sem_close");
+        return;
+     }
+     if (sem_close(g_Full) == -1)
+     {
+        perror("sem_close");
+        return;
+     }
+     
+     if (sem_unlink("/semaphore_free") == -1)
+     {
+        perror("sem_unlink");
+        return;
+     }
+     
+     if (sem_unlink("/semaphore_full") == -1) {
+        perror("sem_unlink");
+        return;
+     }
+#endif  /* __MAC__ */
 
-	free ( thrID );
-	return;
-	}
+     free ( thrID );
+     return;
+}
 
 bool FindByCost ( int ** values, int size, int maxCost, TRect * res )
  {

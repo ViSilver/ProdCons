@@ -3,16 +3,17 @@ CXX=g++
 CXXFLAGS=-Wall -pedantic -g
 LIBS=-lpthread
 TARGET = ./bin
+SOURCE = ./src
 
 all: $(TARGET)/seqtest $(TARGET)/speedtest $(TARGET)/thrtest
 
-$(TARGET)/seqtest: seqmain.cpp solution.cpp
+$(TARGET)/seqtest: $(SOURCE)/seqmain.cpp $(SOURCE)/solution.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $< $(LIBS)
 
-$(TARGET)/speedtest: speedmain.cpp solution.cpp
+$(TARGET)/speedtest: $(SOURCE)/speedmain.cpp $(SOURCE)/solution.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $< $(LIBS)
 
-$(TARGET)/thrtest: thrmain.cpp solution.cpp
+$(TARGET)/thrtest: $(SOURCE)/thrmain.cpp $(SOURCE)/solution.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $< $(LIBS)
 
 clean:
