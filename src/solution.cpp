@@ -78,7 +78,7 @@ struct ProdCrimeStruct
 	const TCrimeProblem * (* tCrimeFunc) ( void ); // Pointer to crimeFunc
 };
 
-PROC_DATA 			* g_Queue;
+PROC_DATA 			** g_Queue;
 int 				g_Pos, g_Prods, g_Conrs;
 
 pthread_mutex_t  	g_Mtx;
@@ -88,7 +88,13 @@ sem_t 				g_Full, g_Free;
 sem_t 				*g_Full, *g_Free;
 #endif
 
-void * prodCostFunc ( void * ) // To be implemented a prodFunc for each type of producer
+
+bool FindByCost ( int ** values, int size, int maxCost, TRect * res );
+bool FindByCrime ( double ** values, int size, double maxCrime, TRect * res );
+
+
+
+void * prodCostFunc ( void * data) // To be implemented a prodFunc for each type of producer
  {
 	int i;
 	 
@@ -97,30 +103,42 @@ void * prodCostFunc ( void * ) // To be implemented a prodFunc for each type of 
 			// Call the problem generating function and store the data into a local variable
 			// Check if the received value is NULL
 
-			//var = 
+            const TCostProblem * tmp = ( ( ProdCostStruct * ) data ) -> tCostFunc();
+            PROC_DATA * pData = (PROC_DATA *) malloc ( sizeof ( * pData ) );
+            
+            pData -> data = (void *) tmp;
+            
+            if (tmp == NULL) {
+                pData -> type = dummy;
+            } else
+            {
+                pData -> type = cost;
+            }
 
 #ifndef __MAC__
             sem_wait ( &g_Free );
 #else  // LINUX
-            sem_wait (g_Free);
+            sem_wait ( g_Free );
 #endif  // MAC
 			pthread_mutex_lock ( &g_Mtx );   //first erorr
 			
 			// set the current cell of the queue to the problem pointer
+            g_Queue[g_Pos] = pData;
 			// increment g_Pos
+            g_Pos++;
 
 			pthread_mutex_unlock ( &g_Mtx );
 #ifndef __MAC__
 			sem_post ( &g_Full );
 #else  // LINUX
-            sem_post (g_Full);
+            sem_post ( g_Full );
 #endif
 			
 		}
 	return ( NULL );
  }
 
- void * prodCrimeFunc ( void * ) // To be implemented a prodFunc for each type of producer
+ void * prodCrimeFunc ( void * data) // To be implemented a prodFunc for each type of producer
  {
 	int i;
 	 
@@ -129,57 +147,111 @@ void * prodCostFunc ( void * ) // To be implemented a prodFunc for each type of 
 			// Call the problem generating function and store the data into a local variable
 			// Check if the received value is NULL
 
-			//var = 
+            const TCrimeProblem * tmp =  ( ( ProdCrimeStruct * ) data ) -> tCrimeFunc();
+            PROC_DATA * pData = (PROC_DATA *) malloc ( sizeof ( * pData ) );
+            
+            pData -> data = (void *) tmp;
+            
+            if (tmp == NULL) {
+                pData -> type = dummy;
+            } else
+            {
+                pData -> type = crime;
+            }
 
 #ifndef __MAC__
             sem_wait ( &g_Free );
 #else  // LINUX
-            sem_wait (g_Free);
+            sem_wait ( g_Free );
 #endif  // MAC
 			pthread_mutex_lock ( &g_Mtx );   //first erorr
 			
-			// set the current cell of the queue to the problem pointer
-			// increment g_Pos
+            // set the current cell of the queue to the problem pointer
+            g_Queue[g_Pos] = pData;
+            // increment g_Pos
+            g_Pos ++;
 
 			pthread_mutex_unlock ( &g_Mtx );
 #ifndef __MAC__
             sem_post ( &g_Full );
 #else  // LINUX
-            sem_post (g_Full);
+            sem_post ( g_Full );
 #endif
 			
 		}
 	return ( NULL );
  }
 
-void * consFunc ( intptr_t  id )
+void * consFunc ( void )
  {
+     TCrimeProblem * tCrime;
+     TCostProblem * tCost;
+     PROC_DATA * pData;
+     TRect * tRect;
+     tRect = (TRect *) malloc ( sizeof ( * tRect ) );
+     
 	while ( 1 )
 		{
+            tCrime = NULL;
+            tCost = NULL;
+            pData = NULL;
+            tRect -> m_W = 0;
+            tRect -> m_H = 0;
+            tRect -> m_X = 0;
+            tRect -> m_Y = 0;
+            
 			//sleep(1);
 #ifndef __MAC__
             sem_wait ( &g_Full );
 #else  // LINUX
-            sem_wait (g_Full);
+            sem_wait ( g_Full );
 #endif  // MAC
 			pthread_mutex_lock ( &g_Mtx );
 
 			// decrement g_Pos
+            g_Pos--;
 			// get the structure of data and set the value of the array to NULL
+            pData = g_Queue[g_Pos];
 
 			pthread_mutex_unlock ( &g_Mtx );
 #ifndef __MAC__
             sem_post ( &g_Free );
 #else  // LINUX
-            sem_post (g_Free);
+            sem_post ( g_Free );
 #endif
-
-			// Check if it is dummy - check if it is the last consumer
-			// If it is dummy - deallocate the dynamic variables
-
-			// Call the problem function and solve it
-			// call the m_Done() function
-			
+            
+            // Check if it is dummy - check if it is the last consumer
+            // If it is dummy - deallocate the dynamic variables
+            
+            // Call the problem function and solve it
+            // call the m_Done() function
+            
+            switch (pData -> type) {
+                case crime:
+                    tCrime = (TCrimeProblem *) (pData -> data);
+                    if ( FindByCrime ( tCrime -> m_Values, tCrime -> m_Size, tCrime -> m_MaxCrime, tRect ) ) {
+                        tCrime -> m_Done ( tCrime, tRect );
+                    } else {
+                        tCrime -> m_Done ( tCrime, NULL );
+                    }
+                    free ( pData );
+                    break;
+                    
+                case cost:
+                    tCost = (TCostProblem *) (pData -> data);
+                    if ( FindByCost ( tCost -> m_Values, tCost -> m_Size, tCost -> m_MaxCost, tRect ) ) {
+                        tCost -> m_Done ( tCost, tRect );
+                    } else {
+                        tCost -> m_Done ( tCost, NULL );
+                    }
+                    free ( pData );
+                    break;
+                    
+                default:
+                    // If this is a dummy data
+                    free ( pData );
+                    break;
+            }
 		}
 	return ( NULL );
  }
@@ -194,7 +266,7 @@ void MapAnalyzer ( int threads, const TCostProblem * (* costFunc) ( void ), cons
 	thrID = (pthread_t *) malloc ( sizeof ( *thrID ) * ( threads + 2 ) );
 
 	// Initialization of global variables
-     g_Queue = (PROC_DATA *) malloc ( sizeof ( *g_Queue ) * ( threads + 6 ) );
+     g_Queue = (PROC_DATA **) malloc ( sizeof ( *g_Queue ) * ( threads + 6 ) );
      g_Conrs = threads;
      g_Prods = 2;
      g_Pos = 0;
@@ -248,11 +320,12 @@ void MapAnalyzer ( int threads, const TCostProblem * (* costFunc) ( void ), cons
 	// }
 
      for ( i = 0; i < threads; i ++ )
-         if ( pthread_create ( &thrID[i + threads], &attr, (void*(*)(void*)) consFunc, (void*)(intptr_t) (i + 1) ) )
+         if ( pthread_create ( &thrID[2 + i], &attr, (void *(*)(void *)) consFunc, NULL))
          {
              perror ( "pthread_create" );
              return;
          }
+     
      pthread_attr_destroy ( &attr );
 		 
      for ( i = 0; i < threads + 2; i ++ )
@@ -295,6 +368,7 @@ bool FindByCost ( int ** values, int size, int maxCost, TRect * res )
 	long ** precalc, A, B, C, D, sum;
 	struct TRect * max_rect;
 	int maxArea = 0;
+    bool found = false;
 
 	max_rect = new TRect;
 
@@ -381,6 +455,7 @@ bool FindByCost ( int ** values, int size, int maxCost, TRect * res )
 						max_rect -> m_W = j + 1;
 						max_rect -> m_H = l + 1;
 						maxArea = area;
+                        found = true;
 					}
 				}
 			}
@@ -403,7 +478,7 @@ bool FindByCost ( int ** values, int size, int maxCost, TRect * res )
 	free (precalc);
 	delete max_rect;
 
-	 return (!(res -> m_Y == 0 && res -> m_X == 0 && (res -> m_W == 0 || res -> m_H == 0)));
+	 return (found);
  }
 
 void recomputeCrimeMatrix(int ** m1, int ** m2, int size, int col)
@@ -428,6 +503,7 @@ bool FindByCrime ( double ** values, int size, double maxCrime, TRect * res )
  {  
 	int ** tmp, ** s_tmp, h, prev, last;
 	struct TRect * max_rect;
+    bool found = false;
 
 	max_rect = new TRect;
 
@@ -517,6 +593,7 @@ bool FindByCrime ( double ** values, int size, double maxCrime, TRect * res )
 				max_rect -> m_H = h;
 				max_rect -> m_Y = last - h;
 				max_rect -> m_X = i;
+                found = true;
 			}	
 		}
 	}
@@ -538,7 +615,7 @@ bool FindByCrime ( double ** values, int size, double maxCrime, TRect * res )
 	free (s_tmp);
 	delete max_rect;
 
-	 return (!(res -> m_Y == 0 && res -> m_X == 0 && (res -> m_W == 0 || res -> m_H == 0)));
+	 return (found);
  }
 
 
