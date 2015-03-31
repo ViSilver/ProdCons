@@ -114,8 +114,8 @@ void * prodCostFunc ( void * data) // To be implemented a prodFunc for each type
                 pData -> data = NULL;
                 
                 pthread_mutex_lock ( &g_Mtx2 );
-                g_Prods--;
-                bool last = (g_Prods == 0);
+                //g_Prods--;
+                bool last = (g_Prods == 1);
                 pthread_mutex_unlock ( &g_Mtx2 );
                 
                 if (last) {
@@ -137,6 +137,9 @@ void * prodCostFunc ( void * data) // To be implemented a prodFunc for each type
 #endif
                     }
                 } else {
+                    pthread_mutex_lock ( &g_Mtx2 );
+                    g_Prods--;
+                    pthread_mutex_unlock ( &g_Mtx2 );
                     free (pData);
                 }
                 return (NULL);
@@ -184,8 +187,8 @@ void * prodCostFunc ( void * data) // To be implemented a prodFunc for each type
                 pData -> data = NULL;
                 
                 pthread_mutex_lock ( &g_Mtx2 );
-                g_Prods--;
-                bool last = (g_Prods == 0);
+                //g_Prods--;
+                bool last = (g_Prods == 1);
                 pthread_mutex_unlock ( &g_Mtx2 );
                 
                 if (last) {
@@ -207,6 +210,9 @@ void * prodCostFunc ( void * data) // To be implemented a prodFunc for each type
 #endif
                     }
                 } else {
+                    pthread_mutex_lock ( &g_Mtx2 );
+                    g_Prods--;
+                    pthread_mutex_unlock ( &g_Mtx2 );
                     free (pData);
                 }
                 return (NULL);
