@@ -4,7 +4,7 @@
 #include "solution.cpp"
 
  
-//pthread_mutex_t    g_Mtx;
+pthread_mutex_t    g_Mtx;
 int                g_Cost, g_Crime;
 
 //-------------------------------------------------------------------------------------------------
