@@ -429,45 +429,14 @@ void MapAnalyzer ( int threads, const TCostProblem * (* costFunc) ( void ), cons
      return;
 }
 
-bool FindByCost ( int ** values, int size, int maxCost, TRect * res )
- {
-	long ** precalc, A, B, C, D, sum;
-	struct TRect * max_rect;
-	int maxArea = 0;
-    bool found = false;
-
-	max_rect = new TRect;
-
-	max_rect -> m_X = 0;
-	max_rect -> m_Y = 0;
-	max_rect -> m_W = 0;
-	max_rect -> m_H = 0;
-
-	// memory allocation for temporary array
-	precalc = (long **) malloc ( sizeof( long * ) * size );
-
-	for (int i = 0; i < size; i ++)
-	{
-		precalc[i] = (long *) malloc ( sizeof( long ) * size );
-	}
-
-	// reading the input data
-	for (int y = 0; y < size; y++)
-	{
-		for (int x = 0; x < size; x++ )	
-		{
-				precalc[y][x] = (long) values[y][x];    // values[y][x]
-		}
-	}
-
-	// precalculating the first row and the first column
+void precalcCostMat(long ** precalc, int size) 
+{
 	for (int i = 1; i < size; i++)
 	{
 		precalc[i][0] += precalc[i-1][0];
 		precalc[0][i] += precalc[0][i-1];
 	}
 
-	// precalculating the rest of the matrix
 	for (int i = 1; i < size; i++)
 	{
 		for (int j = 1; j < size; j++)
@@ -475,77 +444,111 @@ bool FindByCost ( int ** values, int size, int maxCost, TRect * res )
 			precalc[i][j] += precalc[i-1][j] + precalc[i][j-1] - precalc[i-1][j-1]; 
 		}
 	}
+}
 
-	for (int j = size - 1; j >= 0; j--) 
+void setRectValues(TRect * tRect, int x, int y, int w, int h)
+{
+	tRect -> m_X = x;
+	tRect -> m_Y = y;
+	tRect -> m_W = w;
+	tRect -> m_H = h;
+}
+
+bool FindByCost ( int ** values, int size, int maxCost, TRect * res ) // aproape gata
+{
+	long ** precalc, A, B, C, D, sum;
+	struct TRect * max_rect;
+	int maxArea = 0, area = 0;
+	bool found = false;
+
+	max_rect = new TRect;
+
+	precalc = new long * [size];
+
+	for (int i = 0; i < size; i ++)
 	{
-		for (int l = size - 1; l >= 0; l--)
+		precalc[i] = new long [size];
+	}
+
+	for (int y = 0; y < size; y++)
+	{
+		for (int x = 0; x < size; x++ )	
 		{
-			for (int i = 0; i < size - j; i++)
+				precalc[y][x] = (long) values[y][x];   
+		}
+	}
+
+	setRectValues(max_rect, 0, 0, 0, 0);
+
+	precalcCostMat(precalc, size);
+
+	for (int j = 0; j < size; j++) 
+	{
+		for (int l = 0; l < size; l++)
+		{
+			for (int i = j; i < size; i++)
 			{
-				for (int k = 0; k < size - l; k++)
+				for (int k = l; k < size; k++)
 				{
-					if(i == 0 && k == 0)
+					area = ( k - l + 1 ) * ( i - j + 1 );
+
+					if ( area > maxArea )
 					{
-						A = 0;
-						B = 0;
-						C = 0;
-						D = precalc[k + l][i + j];
-					} else {
-						if(i == 0){
+						if ( j == 0 && l == 0 )
+						{
 							A = 0;
-							B = precalc[k - 1][i + j];
+							B = 0;
 							C = 0;
-							D = precalc[k + l][i + j];
+							D = precalc[k][i];
 						} else {
-							if (k == 0){
+							if ( j == 0 )
+							{
 								A = 0;
-								B = 0;
-								C = precalc[k + l][i - 1];
-								D = precalc[k + l][i + j];
+								B = precalc[l - 1][i];
+								C = 0;
+								D = precalc[k][i];
 							} else {
-								A = precalc[k - 1][i - 1];
-								B = precalc[k - 1][i + j];
-								C = precalc[k + l][i - 1];
-								D = precalc[k + l][i + j];
+								if ( l == 0 )
+								{
+									A = 0;
+									B = 0;
+									C = precalc[k][j - 1];
+									D = precalc[k][i];
+								} else {
+									A = precalc[l - 1][j - 1];
+									B = precalc[l - 1][i];
+									C = precalc[k][j - 1];
+									D = precalc[k][i];
+								}
 							}
 						}
-					}
 
-					sum = D + A - B - C;
-					int area = (l + 1) * (j + 1);
+						sum = D + A - B - C;
 
-					if (sum <= maxCost && area > maxArea)
-					{
-						max_rect -> m_X = i;
-						max_rect -> m_Y = k;
-						max_rect -> m_W = j + 1;
-						max_rect -> m_H = l + 1;
-						maxArea = area;
-                        found = true;
+						if ( sum <= maxCost )
+						{
+							setRectValues( max_rect, j, l, i - j + 1, k - l + 1 );
+							maxArea = area;
+							found = true;
+						}
 					}
 				}
 			}
 		} 
 	}
 
-	///// Returning the result 
+	setRectValues(res, max_rect -> m_X, max_rect -> m_Y, max_rect -> m_W, max_rect -> m_H);
 
-	res -> m_Y = max_rect -> m_Y;
-	res -> m_X = max_rect -> m_X;
-	res -> m_H = max_rect -> m_H;
-	res -> m_W = max_rect -> m_W;
-
-	// cleanup
 	for (int i = 0; i < size; i++)
 	{
-		free (precalc[i]);
+		delete[] precalc[i];
 	}
 
-	free (precalc);
+	delete[] precalc;
 	delete max_rect;
 
-	 return (found);
- }
+	return (found);
+}
 
 void recomputeCrimeMatrix(int ** m1, int ** m2, int size, int col)
  {
